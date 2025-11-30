@@ -1,7 +1,6 @@
 # Baseline Pitch Correction – Launchpad
 
-This README is a quick start for the baseline (single‑note) model only. It shows how to add data, preprocess and augment, train, where the TFLite ends up, what its inputs/outputs are, and a short deployment outline. A more detailed, legacy guide follows below.
-
+It shows how to add data, preprocess and augment, train, where the TFLite ends up, and  what its inputs/outputs are.
 ## TL;DR (commands)
 
 ```bash
