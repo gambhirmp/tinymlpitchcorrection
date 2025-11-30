@@ -1,0 +1,34 @@
+{
+  "model_name": "streaming_pitch_corrector",
+  "input": {
+    "features": {
+      "shape": [1, 1, 64],
+      "type": "int8",
+      "order": "NHW"
+    },
+    "state": "opaque"
+  },
+  "output": {
+    "shift_cents": {
+      "shape": [1, 1, 1],
+      "type": "int8",
+      "scale": 2.0,
+      "zero_point": 0,
+      "meaning": "cents in [-300, 300] approximately"
+    },
+    "confidence": {
+      "shape": [1, 1, 1],
+      "type": "int8",
+      "meaning": "[0,1]"
+    },
+    "state": "opaque"
+  },
+  "feature_norm": "feature_norm.json",
+  "audio": {
+    "sample_rate_hz": 16000,
+    "stft_window_samples": 512,
+    "stft_hop_samples": 160,
+    "mel_bands": 64
+  }
+}
+

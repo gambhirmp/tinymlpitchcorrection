@@ -1,0 +1,22 @@
+# Non-baseline archive
+archive_nonbaseline/
+
+# Generated data/features
+data/interim/
+data/processed/
+
+# Listening renders and non-baseline artifacts
+artifacts/listen/
+artifacts/full/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Local virtual environments
+.venv312/
+.venv/
+
+# Executed notebooks (large outputs)
+notebooks/*.executed.ipynb
+
+
