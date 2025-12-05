@@ -17,6 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import soundfile as sf
 import tensorflow as tf
+import argparse
 
 ROOT = Path("/Users/mayagambhir/3600_final")
 PROC = ROOT / "data/processed/features"
@@ -67,23 +68,35 @@ def list_npz_subset(limit=8):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Plot teacher vs model corrected pitch tracks.")
+    parser.add_argument("--model", type=str, default=str((ROOT / "artifacts/baseline/saved_model")),
+                        help="Path to SavedModel directory for the model to evaluate.")
+    parser.add_argument("--contains", type=str, default="",
+                        help="Only include clips whose raw path contains this (case-insensitive) substring.")
+    parser.add_argument("--limit", type=int, default=10, help="Maximum number of clips to plot.")
+    parser.add_argument("--include-aug", action="store_true",
+                        help="Include augmented clips (filenames with _ps). By default they are skipped.")
+    args = parser.parse_args()
+
     mu, sd, fps, sr = load_feature_norm()
     clip_map = load_clip_map()
-    serve = tf.saved_model.load(str(ROOT / "artifacts/baseline/saved_model"))
+    serve = tf.saved_model.load(args.model)
+    needle = args.contains.lower()
 
-    for npz_path in list_npz_subset(limit=10):
+    plotted = 0
+    for npz_path in list_npz_subset(limit=10_000):
         npz_path = Path(npz_path)
         clip_id = npz_path.stem
         raw_path = clip_map.get(clip_id)
-        # Only originals: skip augmented files that contain '_ps' in the raw path
-        raw_rel = None
-        for k, v in clip_map.items():
-            if k == clip_id:
-                raw_rel = v
-                break
-        if raw_rel and "_ps" in raw_rel:
+        if not raw_path:
             continue
-        if not raw_path or not Path(raw_path).exists():
+        # Filter by substring if requested
+        if needle and needle not in raw_path.lower():
+            continue
+        # Skip augmented unless requested
+        if (not args.include_aug) and "_ps" in raw_path:
+            continue
+        if not Path(raw_path).exists():
             print(f"[WARN] missing raw audio for {clip_id}, skipping.")
             continue
 
@@ -128,6 +141,9 @@ def main():
         plt.savefig(out, dpi=150)
         plt.close(fig)
         print(f"Wrote: {out}  |  MAE={mae_cents:.2f} cents")
+        plotted += 1
+        if plotted >= args.limit:
+            break
 
 
 if __name__ == "__main__":
