@@ -10,7 +10,7 @@ import numpy as np
 import librosa
 import soundfile as sf
 
-ROOT = Path("/Users/mayagambhir/3600_final")
+ROOT = Path("/Users/brandontsai/ESE3600/tinymlpitchcorrection")
 SRC = ROOT / "data/raw/notes"
 SR = 16000
 # Include octaves and musically common intervals
