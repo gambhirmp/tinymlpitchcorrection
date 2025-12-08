@@ -7,7 +7,7 @@ data/processed/
 
 # Listening renders and non-baseline artifacts
 artifacts/listen/
-artifacts/full/
+artifacts/baseline/
 
 # Jupyter checkpoints
 .ipynb_checkpoints/
@@ -19,4 +19,4 @@ artifacts/full/
 # Executed notebooks (large outputs)
 notebooks/*.executed.ipynb
 
-
+scripts/eval/
