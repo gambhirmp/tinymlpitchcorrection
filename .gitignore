@@ -3,7 +3,6 @@ archive_nonbaseline/
 
 # Generated data/features
 data/interim/
-data/processed/
 
 # Artifacts
 
