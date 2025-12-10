@@ -5,9 +5,12 @@ archive_nonbaseline/
 data/interim/
 data/processed/
 
+# Artifacts
+
 # Listening renders and non-baseline artifacts
 artifacts/listen/
 artifacts/baseline/
+artifacts/plots/
 
 # Jupyter checkpoints
 .ipynb_checkpoints/
@@ -16,8 +19,10 @@ artifacts/baseline/
 .venv312/
 .venv311/
 .venv/
+.venv_run/
 
 # Executed notebooks (large outputs)
 notebooks/*.executed.ipynb
+notebooks/baseline_single_note.ipynb
 
 scripts/eval/

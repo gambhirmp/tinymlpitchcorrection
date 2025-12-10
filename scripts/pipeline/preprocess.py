@@ -19,7 +19,6 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-
 import numpy as np
 import soundfile as sf
 import librosa
@@ -31,14 +30,14 @@ INTERIM_DIR = DATA_DIR / "interim"
 PROC_DIR = DATA_DIR / "processed" / "features"
 META_DIR = ROOT / "metadata"
 
-# Audio / feature params
-SAMPLE_RATE = 16000
-WIN_S = 512
-HOP_S = 160
-FPS = int(SAMPLE_RATE / HOP_S)  # 100
-N_MELS = 64
-FMIN = 50.0
-FMAX = 2000.0
+# params
+SAMPLE_RATE = 16000  # sample rate for all audio (Hz)
+WIN_S = 512          # window size 
+HOP_S = 160          # hop length 
+FPS = int(SAMPLE_RATE / HOP_S)  # frames per second for features
+N_MELS = 64          # number of mel filterbank channels
+FMIN = 50.0          # minimum frequency (Hz) for mel spectrograms
+FMAX = 2000.0        # maximum frequency (Hz) for mel spectrograms
 
 
 def ensure_dirs() -> None:
@@ -55,7 +54,7 @@ def ensure_dirs() -> None:
     ]:
         d.mkdir(parents=True, exist_ok=True)
 
-
+# normalizes the audio to -18 dB 
 def db_normalize(audio: np.ndarray, target_db: float = -18.0, eps: float = 1e-9) -> np.ndarray:
     rms = np.sqrt(np.mean(audio**2) + eps)
     current_db = 20.0 * np.log10(rms + eps)
@@ -63,12 +62,12 @@ def db_normalize(audio: np.ndarray, target_db: float = -18.0, eps: float = 1e-9)
     gain = 10 ** (gain_db / 20.0)
     return np.clip(audio * gain, -1.0, 1.0)
 
-
+# removes silence from the audio
 def trim_silence(audio: np.ndarray, top_db: float = 40.0) -> np.ndarray:
     yt, _ = librosa.effects.trim(audio, top_db=top_db)
     return yt
 
-
+# computes the log-mel spectrogram
 def compute_logmel(y: np.ndarray, sr: int) -> np.ndarray:
     S = librosa.feature.melspectrogram(
         y=y,
@@ -86,7 +85,7 @@ def compute_logmel(y: np.ndarray, sr: int) -> np.ndarray:
     logmel = librosa.power_to_db(S, ref=1.0, top_db=80.0)
     return logmel.T.astype(np.float32)  # [T, 64]
 
-
+# estimates the fundamental frequency (f0) using the pyin algorithm
 def estimate_f0(y: np.ndarray, sr: int) -> Tuple[np.ndarray, np.ndarray]:
     f0, voiced_flag, voiced_prob = librosa.pyin(
         y,
@@ -108,11 +107,11 @@ def estimate_f0(y: np.ndarray, sr: int) -> Tuple[np.ndarray, np.ndarray]:
     voiced = (voiced_prob > 0.5).astype(np.float32)
     return f0, voiced
 
-
+# converts the frequency in Hz to cents
 def hz_to_cents(f0_hz: np.ndarray, ref_hz: float = 440.0, eps: float = 1e-6) -> np.ndarray:
     return 1200.0 * np.log2((f0_hz + eps) / ref_hz)
 
-
+# applies a low-pass filter to the signal
 def lowpass_exponential(x: np.ndarray, cutoff_hz: float, fps: int) -> np.ndarray:
     # First-order low-pass filter with cutoff in Hz (on frame-rate domain)
     # alpha derived from RC filter: alpha = dt / (RC + dt), with RC = 1/(2*pi*fc)
@@ -126,12 +125,12 @@ def lowpass_exponential(x: np.ndarray, cutoff_hz: float, fps: int) -> np.ndarray
         y[i] = prev
     return y
 
-
+# rounds the frequency in cents to the nearest 100 cents
 def snap_to_chromatic(cents: np.ndarray) -> np.ndarray:
     # Round to nearest 100 cents
     return np.round(cents / 100.0) * 100.0
 
-
+# snaps the trend to the nearest 100-cent step with hysteresis and minimum hold-time
 def hysteretic_snap(trend: np.ndarray, deadband_cents: float, min_frames: int) -> np.ndarray:
     """
     Snap trend (cents) to 100-cent steps with hysteresis and minimum hold-time.
@@ -157,7 +156,7 @@ def hysteretic_snap(trend: np.ndarray, deadband_cents: float, min_frames: int) -
         snapped[i] = note
     return snapped
 
-
+# builds the targets for the pitch correction model
 def build_targets(
     f0_cents: np.ndarray,
     voiced: np.ndarray,
@@ -183,7 +182,7 @@ class ClipMeta:
     duration_sec: float
     scale_id: Optional[str] = None
 
-
+# iterates over the raw wav files
 def iter_raw_wavs() -> List[Tuple[str, Path]]:
     """
     Return list of (category, wav_path) scanning raw data recursively to include nested folders
@@ -198,7 +197,7 @@ def iter_raw_wavs() -> List[Tuple[str, Path]]:
             pairs.append((category, wav_path))
     return pairs
 
-
+# processes a single clip
 def process_clip(
     category: str,
     wav_path: Path,
@@ -212,13 +211,12 @@ def process_clip(
     if y.ndim > 1:
         y = np.mean(y, axis=1)
     if sr != SAMPLE_RATE:
-        # Use soxr backend to avoid resampy dependency
         y = librosa.resample(y, orig_sr=sr, target_sr=SAMPLE_RATE, res_type="soxr_hq")
         sr = SAMPLE_RATE
     y = db_normalize(y)
     y = trim_silence(y)
     duration_sec = len(y) / sr
-    # Save interim (optional)
+    # saves the interim 
     resampled_path = INTERIM_DIR / "resampled" / f"{category}_{singer_id}_{take_id}.wav"
     resampled_path.parent.mkdir(parents=True, exist_ok=True)
     sf.write(str(resampled_path), y, sr)
@@ -227,6 +225,7 @@ def process_clip(
     logmel = compute_logmel(y, sr)  # [T, 64]
     f0_hz, voiced = estimate_f0(y, sr)
     f0_cents = hz_to_cents(f0_hz)
+    # builds the targets for the pitch correction model
     target_shift = build_targets(
         f0_cents,
         voiced,
@@ -234,13 +233,16 @@ def process_clip(
         deadband_cents=deadband_cents,
         min_hold_frames=min_hold_frames,
     )
+    # truncates the features to the shortest length
     T = min(len(logmel), len(f0_cents), len(target_shift), len(voiced))
     logmel = logmel[:T]
     f0_cents = f0_cents[:T]
     target_shift = target_shift[:T]
     voiced = voiced[:T]
 
+    # generates a unique clip id
     clip_id = f"{category}_{singer_id}_{take_id}_{uuid.uuid4().hex[:8]}"
+    # creates a metadata object
     meta = ClipMeta(
         clip_id=clip_id,
         category=category,
@@ -251,6 +253,7 @@ def process_clip(
         duration_sec=float(duration_sec),
         scale_id=None,
     )
+    # creates a dictionary of the features: logmel, f0_cents, voiced, target_shift
     arrays = {
         "logmel": logmel.astype(np.float32),
         "f0_cents": f0_cents.astype(np.float32),
@@ -259,14 +262,14 @@ def process_clip(
     }
     return meta, arrays
 
-
+# writes the features to a npz file
 def write_npz(split: str, clip_id: str, arrays: Dict[str, np.ndarray]) -> Path:
     out_path = PROC_DIR / split / f"{clip_id}.npz"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(out_path, **arrays)
     return out_path
 
-
+# updates the clips csv file
 def update_clips_csv(rows: List[ClipMeta]) -> None:
     csv_path = META_DIR / "clips.csv"
     have_header = csv_path.exists() and csv_path.stat().st_size > 0
@@ -279,7 +282,7 @@ def update_clips_csv(rows: List[ClipMeta]) -> None:
                 f"{r.sample_rate},{r.duration_sec},{'' if r.scale_id is None else r.scale_id}\n"
             )
 
-
+# performs a stratified split of the clips
 def stratified_split(metas: List[ClipMeta], seed: int = 13) -> Dict[str, List[str]]:
     rng = np.random.RandomState(seed)
     by_singer: Dict[str, List[ClipMeta]] = {}
@@ -298,7 +301,7 @@ def stratified_split(metas: List[ClipMeta], seed: int = 13) -> Dict[str, List[st
         train_ids.extend([m.clip_id for m in items[n_test + n_val:]])
     return {"train": train_ids, "val": val_ids, "test": test_ids}
 
-
+# computes the feature normalization
 def compute_feature_norm(all_feature_paths: List[Path]) -> Tuple[List[float], List[float]]:
     # Stream over files to compute mean/std per mel bin
     sum_vec = np.zeros((N_MELS,), dtype=np.float64)
@@ -345,6 +348,7 @@ def main(args: Optional[List[str]] = None) -> None:
     metas: List[ClipMeta] = []
     arrays_by_id: Dict[str, Dict[str, np.ndarray]] = {}
 
+    # processes the clips
     for category, wav_path in pairs:
         try:
             meta, arrays = process_clip(
@@ -363,23 +367,24 @@ def main(args: Optional[List[str]] = None) -> None:
         print("[INFO] No clips found. Place WAV files under data/raw and rerun.")
         return
 
-    # Split
+    # splits the clips
     splits = stratified_split(metas, seed=parsed.seed)
     write_json(META_DIR / "splits.json", splits)
 
-    # Save NPZs
+    # saves the npzs ( augmented clips train-only)
     for m in metas:
         split = "train"
         if m.clip_id in splits["val"]:
             split = "val"
         elif m.clip_id in splits["test"]:
             split = "test"
+        if "_ps" in m.take_id:
+            split = "train"
         write_npz(split, m.clip_id, arrays_by_id[m.clip_id])
 
-    # Update clips.csv
     update_clips_csv(metas)
 
-    # Compute normalization from train set
+    # normalization 
     train_paths = [PROC_DIR / "train" / f"{cid}.npz" for cid in splits["train"]]
     mean, std = compute_feature_norm(train_paths)
     write_json(

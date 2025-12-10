@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-Augment raw note WAVs by pitch-shifting to new notes and octaves.
-- Input root: data/raw/notes/**/*.wav
+Augment raw WAVs by pitch-shifting to new notes and octaves.
+- Input roots:
+  - data/raw/notes/**/*.wav
+  - data/raw/scales/**/*.wav (if present) or data/raw/notes/scales/*.wav
+  - data/raw/tunes/**/*.wav (if present) or data/raw/notes/twinkle*/**/*.wav
 - Output: same folders with filename suffix _ps{+/-semitones}.wav
 - Skips files that already look augmented (_ps... in stem)
 """
@@ -10,31 +13,58 @@ import numpy as np
 import librosa
 import soundfile as sf
 
-ROOT = Path("/Users/brandontsai/ESE3600/tinymlpitchcorrection")
-SRC = ROOT / "data/raw/notes"
+ROOT = Path("/Users/mayagambhir/3600_final")
+NOTES = ROOT / "data/raw/notes"
+SCALES = ROOT / "data/raw/scales"
+TUNES = ROOT / "data/raw/tunes"
 SR = 16000
-# Include octaves and musically common intervals
+# includes octaves and musically common intervals
 SEMITONES = [-12, -7, -5, -3, 3, 5, 7, 12]
 
 
+# normalizes the audio to the peak amplitude
 def norm_peak(y: np.ndarray) -> np.ndarray:
     peak = float(np.max(np.abs(y)) + 1e-9)
     if peak > 1.0:
         y = y / peak
     return y.astype(np.float32)
 
-
+# checks if the file is already augmented
 def is_augmented_path(p: Path) -> bool:
     return "_ps" in p.stem
 
 
 def main() -> None:
-    wavs = sorted(SRC.rglob("*.wav"))
+    # aggregates all candidate roots that exist
+    roots = []
+    for r in [NOTES, SCALES, TUNES]:
+        if r.exists():
+            roots.append(r)
+    # fallbacks for datasets placed under notes/
+    nested_scales = NOTES / "scales"
+    if nested_scales.exists():
+        roots.append(nested_scales)
+    for name in ["twinkle twinkle little star", "twinkle", "tunes"]:
+        nested_tunes = NOTES / name
+        if nested_tunes.exists():
+            roots.append(nested_tunes)
+
+    # de-duplicates the files
+    seen = set()
+    wavs: list[Path] = []
+    for r in roots:
+        for p in r.rglob("*.wav"):
+            if p.resolve() not in seen:
+                seen.add(p.resolve())
+                wavs.append(p)
+
+    wavs = sorted(wavs)
     if not wavs:
-        print(f"No WAV files found under {SRC}")
+        print(f"No WAV files found under any roots: {roots or '[none]'}")
         return
     written = 0
     skipped = 0
+    # augments the wav files
     for wav in wavs:
         if is_augmented_path(wav):
             skipped += 1
