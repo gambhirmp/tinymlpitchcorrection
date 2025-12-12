@@ -22,6 +22,6 @@ artifacts/plots/
 
 # Executed notebooks (large outputs)
 notebooks/*.executed.ipynb
-notebooks/baseline_single_note.ipynb
+/Users/mayagambhir/3600_final/notebooks/baseline_single_note.ipynb
 
 scripts/eval/
