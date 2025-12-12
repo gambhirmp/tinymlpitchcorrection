@@ -35,7 +35,7 @@ SAMPLE_RATE = 16000  # sample rate for all audio (Hz)
 WIN_S = 512          # window size 
 HOP_S = 160          # hop length 
 FPS = int(SAMPLE_RATE / HOP_S)  # frames per second for features
-N_MELS = 64          # number of mel filterbank channels
+N_MELS = 32          # number of mel filterbank channels
 FMIN = 50.0          # minimum frequency (Hz) for mel spectrograms
 FMAX = 2000.0        # maximum frequency (Hz) for mel spectrograms
 
