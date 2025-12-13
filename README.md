@@ -1,4 +1,4 @@
-# Pitch Correction – Quickstart (Full Melody)
+# Pitch Correction 
 
 This shows how to add data, augment/transpose, preprocess, train, where the TFLite ends up, and what its inputs/outputs are.
 
